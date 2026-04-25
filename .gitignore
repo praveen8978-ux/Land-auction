@@ -1,0 +1,7 @@
+node_modules/
+.env
+uploads/
+*.log
+client/node_modules/
+client/.next/
+client/.env.local
