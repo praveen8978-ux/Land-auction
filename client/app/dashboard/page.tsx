@@ -82,26 +82,31 @@ export default function DashboardPage() {
         </div>
 
         {/* Seller actions */}
-        {user.role === 'seller' && (
-          <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
-            <h3 className="font-semibold text-gray-700 mb-3">Seller actions</h3>
-            <div className="flex gap-3">
-              <Link
-                href="/seller/pay"
-                className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
-              >
-                + List new land
-              </Link>
-              <Link
-                href="/seller/listings"
-                className="border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
-              >
-                My listings
-              </Link>
-            </div>
-          </div>
-        )}
-
+{user.role === 'seller' && (
+  <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">
+    <h3 className="font-semibold text-gray-700 mb-3">Seller actions</h3>
+    <div className="flex gap-3 flex-wrap">
+      <Link
+        href="/seller/pay"
+        className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+      >
+        + List new land
+      </Link>
+      <Link
+        href="/seller/listings"
+        className="border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+      >
+        My listings
+      </Link>
+      <Link
+        href="/auctions"
+        className="border border-gray-200 text-gray-700 px-5 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+      >
+        View auctions
+      </Link>
+    </div>
+  </div>
+)}
         {/* Buyer actions */}
         {user.role === 'buyer' && (
           <div className="mt-6 bg-white rounded-2xl border border-gray-100 p-5">

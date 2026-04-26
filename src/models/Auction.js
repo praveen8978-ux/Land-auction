@@ -14,9 +14,9 @@ const auctionSchema = new mongoose.Schema({
   createdAt:     { type: Date, default: Date.now }
 });
 
-auctionSchema.pre('save', function(next) {
+// No 'next' parameter — same fix as User model
+auctionSchema.pre('save', async function() {
   if (!this.currentPrice) this.currentPrice = this.startingPrice;
-  next();
 });
 
 module.exports = mongoose.model('Auction', auctionSchema);

@@ -27,22 +27,47 @@ export default function Navbar() {
           Land Auction
         </Link>
 
+        {/* Centre links — visible to all logged in users */}
+        {user && (
+          <div className="flex items-center gap-6">
+            <Link
+              href="/auctions"
+              className="text-sm text-gray-600 hover:text-blue-600 transition-colors font-medium"
+            >
+              Live Auctions
+            </Link>
+            {user.role === 'seller' && (
+              <Link
+                href="/seller/listings"
+                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                My Listings
+              </Link>
+            )}
+            {user.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+              >
+                Admin Panel
+              </Link>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-4">
           {user ? (
             <>
               <span className="text-sm text-gray-600">{user.name}</span>
-
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${roleBadgeClass[user.role]}`}>
                 {user.role}
               </span>
-
               <Link
                 href="/dashboard"
                 className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
               >
                 Dashboard
               </Link>
-
               <button
                 onClick={handleLogout}
                 className="text-sm bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"
@@ -52,15 +77,12 @@ export default function Navbar() {
             </>
           ) : (
             <>
-              <Link
-                href="/login"
-                className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
-              >
+              <Link href="/login" className="text-sm text-gray-600 hover:text-blue-600">
                 Sign in
               </Link>
               <Link
                 href="/register"
-                className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors"
+                className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700"
               >
                 Register
               </Link>
