@@ -1,15 +1,17 @@
 require('dotenv').config();
-const express    = require('express');
-const session    = require('express-session');
+const express      = require('express');
+const session      = require('express-session');
 const { MongoStore } = require('connect-mongo');
-const cors       = require('cors');
-const http       = require('http');
-const path       = require('path');
-const connectDB  = require('./src/config/db');
-const initSocket = require('./src/config/socket');
-const landRoutes = require('./src/routes/landRoutes');
+const cors         = require('cors');
+const http         = require('http');
+const path         = require('path');
+const connectDB    = require('./src/config/db');
+const initSocket   = require('./src/config/socket');
 
-const authRoutes = require('./src/routes/authRoutes');
+const authRoutes    = require('./src/routes/authRoutes');
+const adminRoutes   = require('./src/routes/adminRoutes');
+const landRoutes    = require('./src/routes/landRoutes');
+const auctionRoutes = require('./src/routes/auctionRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -37,18 +39,24 @@ app.use(session({
     sameSite: 'lax'
   }
 }));
-app.use('/api/lands', landRoutes);
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/api/auth', authRoutes);
+
+// ── Routes ── (must all be before the 404 handler)
+app.use('/api/auth',     authRoutes);
+app.use('/api/admin',    adminRoutes);
+app.use('/api/lands',    landRoutes);
+app.use('/api/auctions', auctionRoutes);
+app.use('/uploads',      express.static(path.join(__dirname, 'uploads')));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Land Auction API running' });
 });
 
+// ── 404 handler (must be last) ──
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
+// ── Global error handler ──
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: 'Something went wrong on our end' });
