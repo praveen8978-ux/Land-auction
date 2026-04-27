@@ -236,3 +236,92 @@ exports.getMe = async (req, res) => {
     res.status(401).json({ error: 'Not authenticated' });
   }
 };
+
+
+// POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required.' });
+
+  try {
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) return res.status(404).json({ error: 'No account found with this email.' });
+
+    const otp = generateOTP();
+    user.otp       = otp;
+    user.otpExpiry = new Date(Date.now() + 3 * 60 * 1000);
+    await user.save();
+
+    await sendOTPEmail(user.email, otp, user.name);
+    req.session.resetEmail = user.email;
+
+    res.json({ success: true, message: 'OTP sent to your email.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ error: 'Failed to send OTP.' });
+  }
+};
+
+// POST /api/auth/verify-reset-otp
+exports.verifyResetOTP = async (req, res) => {
+  const { otp } = req.body;
+  const email   = req.session.resetEmail;
+
+  if (!email) return res.status(400).json({ error: 'Session expired. Please try again.' });
+  if (!otp)   return res.status(400).json({ error: 'Please enter the OTP.' });
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    if (!user.otpExpiry || user.otpExpiry < new Date())
+      return res.status(400).json({ error: 'OTP has expired. Please request a new one.' });
+
+    if (user.otp !== otp)
+      return res.status(400).json({ error: 'Invalid OTP. Please try again.' });
+
+    // Mark OTP as verified but don't clear yet — needed for reset step
+    req.session.resetVerified = true;
+
+    res.json({ success: true, message: 'OTP verified. You can now reset your password.' });
+  } catch (error) {
+    console.error('Verify reset OTP error:', error);
+    res.status(500).json({ error: 'Verification failed.' });
+  }
+};
+
+// POST /api/auth/reset-password
+exports.resetPassword = async (req, res) => {
+  const { password, confirmPassword } = req.body;
+  const email = req.session.resetEmail;
+
+  if (!req.session.resetVerified)
+    return res.status(400).json({ error: 'Please verify your OTP first.' });
+  if (!email)
+    return res.status(400).json({ error: 'Session expired. Please try again.' });
+  if (!password || !confirmPassword)
+    return res.status(400).json({ error: 'All fields are required.' });
+  if (password !== confirmPassword)
+    return res.status(400).json({ error: 'Passwords do not match.' });
+  if (password.length < 6)
+    return res.status(400).json({ error: 'Password must be at least 6 characters.' });
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ error: 'User not found.' });
+
+    user.password  = password;
+    user.otp       = undefined;
+    user.otpExpiry = undefined;
+    await user.save();
+
+    delete req.session.resetEmail;
+    delete req.session.resetVerified;
+
+    res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ error: 'Failed to reset password.' });
+  }
+};
+  

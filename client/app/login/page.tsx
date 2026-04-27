@@ -83,6 +83,11 @@ export default function LoginPage() {
               className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-colors"
             />
           </div>
+          <div className="flex justify-end mb-2">
+            <Link href="/forgot-password" className="text-xs text-blue-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
 
           <button
             type="submit"
@@ -105,3 +110,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+

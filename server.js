@@ -12,6 +12,7 @@ const authRoutes    = require('./src/routes/authRoutes');
 const adminRoutes   = require('./src/routes/adminRoutes');
 const landRoutes    = require('./src/routes/landRoutes');
 const auctionRoutes = require('./src/routes/auctionRoutes');
+const consortiumRoutes = require('./src/routes/consortiumRoutes');
 
 const app    = express();
 const server = http.createServer(app);
@@ -46,6 +47,7 @@ app.use('/api/admin',    adminRoutes);
 app.use('/api/lands',    landRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/uploads',      express.static(path.join(__dirname, 'uploads')));
+app.use('/api/consortiums', consortiumRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Land Auction API running' });

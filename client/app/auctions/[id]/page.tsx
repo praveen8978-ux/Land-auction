@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import { useAuctionVoice } from '@/lib/useAuctionVoice';
+import ConsortiumPanel from '@/components/ConsortiumPanel';
 
 interface Bid {
   _id:      string;
@@ -199,7 +200,7 @@ export default function AuctionDetailPage() {
 
   const isLive  = auction.status === 'live';
   const isEnded = auction.status === 'ended';
-  const canBid  = isLive && !!user && user.role !== 'admin';
+  const canBid  = isLive && !!user && user.role === 'buyer';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -441,6 +442,14 @@ export default function AuctionDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* Group bidding */}
+            <ConsortiumPanel
+              auctionId={auction._id}
+              currentPrice={auction.currentPrice}
+              user={user}
+              isLive={isLive}
+            />
 
           </div>
         </div>
