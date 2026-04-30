@@ -68,6 +68,12 @@ export default function Navbar() {
               >
                 Dashboard
               </Link>
+              <Link
+                  href="/profile"
+                  className="text-sm text-gray-600 hover:text-blue-600 transition-colors"
+                >
+                  Profile
+                </Link>
               <button
                 onClick={handleLogout}
                 className="text-sm bg-red-50 text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-100 transition-colors"

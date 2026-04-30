@@ -21,6 +21,27 @@ app.set('io', io);
 
 connectDB();
 
+const Auction = require('./src/models/Auction');
+
+const updateAuctionStatuses = async () => {
+  try {
+    const now = new Date();
+    await Auction.updateMany(
+      { status: 'upcoming', startTime: { $lte: now } },
+      { status: 'live' }
+    );
+    await Auction.updateMany(
+      { status: 'live', endTime: { $lte: now } },
+      { status: 'ended' }
+    );
+  } catch (err) {
+    console.error('Auction status update error:', err);
+  }
+};
+
+updateAuctionStatuses();
+setInterval(updateAuctionStatuses, 60 * 1000);
+
 app.use(cors({
   origin: 'http://localhost:3001',
   credentials: true

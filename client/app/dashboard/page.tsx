@@ -87,7 +87,7 @@ export default function DashboardPage() {
     <h3 className="font-semibold text-gray-700 mb-3">Seller actions</h3>
     <div className="flex gap-3 flex-wrap">
       <Link
-        href="/seller/pay"
+        href="/seller/listings/new"
         className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
       >
         + List new land

@@ -26,9 +26,18 @@ const userSchema = new mongoose.Schema({
     enum:    ['buyer', 'seller', 'admin'],
     default: 'buyer'
   },
-  otp:        { type: String  },
-  otpExpiry:  { type: Date    },
-  createdAt:  { type: Date, default: Date.now }
+  otp:       { type: String },
+  otpExpiry: { type: Date  },
+
+  // Location for proximity alerts
+  location: {
+    lat:     { type: Number },
+    lng:     { type: Number },
+    address: { type: String }
+  },
+  locationAlerts: { type: Boolean, default: true },
+
+  createdAt: { type: Date, default: Date.now }
 });
 
 userSchema.pre('save', async function() {

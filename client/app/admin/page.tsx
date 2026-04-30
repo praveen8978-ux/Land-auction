@@ -60,7 +60,7 @@ export default function AdminPage() {
   const [users,           setUsers]           = useState<any[]>([]);
   const [showAuctionForm, setShowAuctionForm] = useState(false);
   const [approvedLands,   setApprovedLands]   = useState<ApprovedLandForAuction[]>([]);
-  const [auctionForm,     setAuctionForm]     = useState({ landId: '', startTime: '', endTime: '' });
+  const [auctionForm,     setAuctionForm]     = useState({ landId: '', startTime: '', endTime: '', reservePrice: '' });
   const [creatingAuction, setCreatingAuction] = useState(false);
   const [auctionMsg,      setAuctionMsg]      = useState('');
 
@@ -161,9 +161,14 @@ export default function AdminPage() {
     setCreatingAuction(true);
     setAuctionMsg('');
     try {
-      await api.post('/api/auctions', auctionForm);
+      await api.post('/api/auctions', {
+        landId:       auctionForm.landId,
+        startTime:    auctionForm.startTime,
+        endTime:      auctionForm.endTime,
+        reservePrice: auctionForm.reservePrice || null
+      });
       setAuctionMsg('Auction created successfully!');
-      setAuctionForm({ landId: '', startTime: '', endTime: '' });
+      setAuctionForm({ landId: '', startTime: '', endTime: '', reservePrice: '' });
       setTimeout(() => {
         setShowAuctionForm(false);
         setAuctionMsg('');
@@ -282,6 +287,19 @@ export default function AdminPage() {
                   type="datetime-local"
                   value={auctionForm.endTime}
                   onChange={e => setAuctionForm(prev => ({ ...prev, endTime: e.target.value }))}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Reserve price (₹) <span className="text-gray-400 text-xs font-normal">optional · hidden from buyers</span>
+                </label>
+                <input
+                  type="number"
+                  value={auctionForm.reservePrice || ''}
+                  onChange={e => setAuctionForm(prev => ({ ...prev, reservePrice: e.target.value }))}
+                  placeholder="e.g. 3000000"
                   className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
                 />
               </div>

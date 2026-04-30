@@ -43,7 +43,18 @@ exports.getAuction = async (req, res) => {
       .sort('-placedAt')
       .limit(20);
 
-    res.json({ success: true, auction, bids });
+    // Hide actual reserve price from buyers — only show if met or user is admin
+    const auctionData = auction.toObject();
+    const isAdmin = req.user?.role === 'admin';
+
+    if (!isAdmin) {
+      // Buyers only see whether reserve is set and whether it has been met
+      auctionData.hasReserve  = !!auction.reservePrice;
+      auctionData.reserveMet  = auction.reserveMet;
+      delete auctionData.reservePrice; // never expose the actual amount
+    }
+
+    res.json({ success: true, auction: auctionData, bids });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch auction.' });
   }
@@ -52,7 +63,7 @@ exports.getAuction = async (req, res) => {
 // POST /api/auctions — admin creates auction for an approved land
 exports.createAuction = async (req, res) => {
   try {
-    const { landId, startTime, endTime } = req.body;
+    const { landId, startTime, endTime, reservePrice } = req.body;
 
     const land = await Land.findById(landId);
     if (!land) return res.status(404).json({ error: 'Land not found.' });
@@ -67,6 +78,8 @@ exports.createAuction = async (req, res) => {
       land:          landId,
       startingPrice: land.startingPrice,
       currentPrice:  land.startingPrice,
+      reservePrice:  reservePrice ? Number(reservePrice) : null,
+      reserveMet:    false,
       startTime:     new Date(startTime),
       endTime:       new Date(endTime),
       createdBy:     req.user._id,
@@ -102,22 +115,38 @@ exports.placeBid = async (req, res) => {
       amount:  Number(amount)
     });
 
-    auction.currentPrice = Number(amount);
+    auction.currentPrice  = Number(amount);
     auction.totalBids    += 1;
-    await auction.save();
+    auction.winner        = req.user._id;
+    auction.winningAmount = Number(amount);
 
+    // Check if reserve price is met
+    let reserveJustMet = false;
+    if (auction.reservePrice && !auction.reserveMet && Number(amount) >= auction.reservePrice) {
+      auction.reserveMet = true;
+      reserveJustMet     = true;
+    }
+
+    await auction.save();
     await bid.populate('bidder', 'name');
 
-    // Emit real-time event to all watching this auction
     req.app.get('io').to(auction._id.toString()).emit('newBid', {
-      amount:    Number(amount),
-      bidder:    req.user.name,
-      bidderId:  req.user._id,
-      timestamp: new Date(),
-      totalBids: auction.totalBids
+      amount:         Number(amount),
+      bidder:         req.user.name,
+      bidderId:       req.user._id,
+      timestamp:      new Date(),
+      totalBids:      auction.totalBids,
+      reserveMet:     auction.reserveMet,
+      reserveJustMet: reserveJustMet
     });
 
-    res.json({ success: true, bid, newPrice: auction.currentPrice });
+    res.json({
+      success:        true,
+      bid,
+      newPrice:       auction.currentPrice,
+      reserveMet:     auction.reserveMet,
+      reserveJustMet: reserveJustMet
+    });
   } catch (error) {
     console.error('Place bid error:', error);
     res.status(500).json({ error: 'Failed to place bid.' });

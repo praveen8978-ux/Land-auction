@@ -22,7 +22,11 @@ listingFeePaid: { type: Boolean, default: false },
 listingFeePaidAt: { type: Date },
   waterSource:  { type: Boolean, default: false },
   electricity:  { type: Boolean, default: false },
-  createdAt:    { type: Date, default: Date.now }
+  createdAt:    { type: Date, default: Date.now },
+  coordinates: {
+  lat: { type: Number },
+  lng: { type: Number }
+}
 });
 
 module.exports = mongoose.model('Land', landSchema);

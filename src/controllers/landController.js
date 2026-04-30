@@ -1,6 +1,9 @@
 const Land = require('../models/Land');
 const path = require('path');
 const fs   = require('fs');
+const User                               = require('../models/User');
+const { sendLocationAlertEmail }         = require('../services/emailService');
+const { getDistanceKm }                  = require('../utils/location');
 
 // POST /api/lands — seller creates a land listing
 exports.createLand = async (req, res) => {
@@ -9,7 +12,8 @@ exports.createLand = async (req, res) => {
       title, description, location, state,
       area, areaUnit, surveyNumber, landType,
       startingPrice, facing, roadAccess,
-      waterSource, electricity
+      waterSource, electricity,
+      lat, lng
     } = req.body;
 
     const photos = req.files ? req.files.map(file =>
@@ -28,6 +32,7 @@ exports.createLand = async (req, res) => {
       startingPrice: Number(startingPrice),
       photos,
       seller:        req.user._id,
+      coordinates:   lat && lng ? { lat: Number(lat), lng: Number(lng) } : undefined,
       listingFeeUTR:    req.body.listingFeeUTR  || null,
       listingFeePaid:   !!req.body.listingFeeUTR,
       listingFeePaidAt: req.body.listingFeeUTR ? new Date() : null,
@@ -37,11 +42,63 @@ exports.createLand = async (req, res) => {
       electricity:   electricity === 'true',
     });
 
+    // Save valuation if provided
+    if (req.body.valuationMin && req.body.valuationMax) {
+      land.aiValuation = {
+        minPrice:     Number(req.body.valuationMin),
+        maxPrice:     Number(req.body.valuationMax),
+        pricePerUnit: Number(req.body.valuationPricePerUnit),
+        confidence:   req.body.valuationConfidence,
+        reasoning:    req.body.valuationReasoning,
+        marketTrend:  req.body.valuationTrend,
+      };
+      await land.save();
+    }
+
+    // Send location alerts to nearby buyers asynchronously
+    if (lat && lng) {
+      sendNearbyBuyerAlerts(land, Number(lat), Number(lng)).catch(err =>
+        console.error('Location alert error:', err)
+      );
+    }
+
     res.status(201).json({ success: true, land });
   } catch (error) {
     console.error('Create land error:', error);
     res.status(500).json({ error: 'Failed to create listing. Please try again.' });
   }
+};
+
+// Send email alerts to all buyers within 50km
+const sendNearbyBuyerAlerts = async (land, landLat, landLng) => {
+  const buyers = await User.find({
+    role:                    'buyer',
+    locationAlerts:          true,
+    'location.lat':          { $exists: true },
+    'location.lng':          { $exists: true }
+  });
+
+  const RADIUS_KM = 50;
+  const alerts    = [];
+
+  for (const buyer of buyers) {
+    const distance = getDistanceKm(
+      buyer.location.lat,
+      buyer.location.lng,
+      landLat,
+      landLng
+    );
+
+    if (distance <= RADIUS_KM) {
+      alerts.push(
+        sendLocationAlertEmail(buyer.email, buyer.name, land, distance)
+          .catch(err => console.error(`Alert failed for ${buyer.email}:`, err))
+      );
+    }
+  }
+
+  await Promise.all(alerts);
+  console.log(`Location alerts sent to ${alerts.length} nearby buyers`);
 };
 
 // GET /api/lands — public: only approved lands visible to buyers and everyone

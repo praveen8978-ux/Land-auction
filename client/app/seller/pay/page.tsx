@@ -31,6 +31,10 @@ export default function PayListingFeePage() {
   const [timeLeft,   setTimeLeft]   = useState(300);
   const [copied,     setCopied]     = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const searchParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+  const justListed = searchParams?.get('listed') === 'true';
 
   // Detect mobile on mount
   useEffect(() => {
@@ -89,7 +93,7 @@ export default function PayListingFeePage() {
     sessionStorage.setItem('listingFeePaid',    'true');
     sessionStorage.setItem('listingFeePaidAt',  new Date().toISOString());
 
-    setTimeout(() => router.push('/seller/listings/new'), 800);
+    setTimeout(() => router.push('/seller/listings'), 800);
   };
 
   if (loading) return (
@@ -106,6 +110,13 @@ export default function PayListingFeePage() {
         {/* ── INFO STEP ── */}
         {step === 'info' && (
           <div className="bg-white rounded-2xl border border-gray-100 p-8">
+            {/* Success banner when coming from listing form */}
+            {justListed && (
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl mb-6 text-sm font-medium flex items-center gap-2">
+                <span>✓</span>
+                Listing submitted for review! Now pay the ₹50 listing fee to activate it.
+              </div>
+            )}
 
             <div className="text-center mb-8">
               <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
