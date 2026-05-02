@@ -68,6 +68,7 @@ app.use('/api/admin',    adminRoutes);
 app.use('/api/lands',    landRoutes);
 app.use('/api/auctions', auctionRoutes);
 app.use('/uploads',      express.static(path.join(__dirname, 'uploads')));
+app.use('/documents',    express.static(path.join(__dirname, 'documents')));
 app.use('/api/consortiums', consortiumRoutes);
 
 app.get('/api/health', (req, res) => {

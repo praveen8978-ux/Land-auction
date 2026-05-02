@@ -6,19 +6,23 @@ import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
+import TrustScore      from '@/components/TrustScore';
+import DocumentUpload  from '@/components/DocumentUpload';
 
 interface Land {
-  _id:              string;
-  title:            string;
-  location:         string;
-  state:            string;
-  area:             number;
-  areaUnit:         string;
-  landType:         string;
-  startingPrice:    number;
-  status:           string;
-  photos:           string[];
-  createdAt:        string;
+  _id:           string;
+  title:         string;
+  location:      string;
+  state:         string;
+  area:          number;
+  areaUnit:      string;
+  landType:      string;
+  startingPrice: number;
+  status:        string;
+  photos:        string[];
+  createdAt:     string;
+  trustScore:    number;
+  documents:     { type: string; verified: boolean }[];
   rejectionReason?: string;
 }
 
@@ -36,6 +40,8 @@ export default function MyListingsPage() {
   const [lands,    setLands]    = useState<Land[]>([]);
   const [fetching, setFetching] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [expandedLand, setExpandedLand] = useState<string | null>(null);
+  const [landDocs, setLandDocs] = useState<Record<string, { score: number; docs: any[] }>>({});
 
   useEffect(() => {
     if (!loading && !user)                  router.push('/login');
@@ -166,6 +172,31 @@ export default function MyListingsPage() {
                     >
                       {deleting === land._id ? 'Deleting...' : 'Delete'}
                     </button>
+                  )}
+                </div>
+
+                {/* Document section */}
+                <div className="mt-3 border-t border-gray-50 pt-3">
+                  <button
+                    onClick={() => setExpandedLand(expandedLand === land._id ? null : land._id)}
+                    className="text-xs text-blue-600 hover:underline font-medium"
+                  >
+                    {expandedLand === land._id ? 'Hide documents ↑' : 'Manage documents ↓'}
+                  </button>
+
+                  {expandedLand === land._id && (
+                    <div className="mt-4 space-y-4">
+                      <TrustScore
+                        score={landDocs[land._id]?.score ?? (land as any).trustScore ?? 0}
+                        documents={landDocs[land._id]?.docs ?? (land as any).documents ?? []}
+                      />
+                      <DocumentUpload
+                        landId={land._id}
+                        onUpload={(score, docs) => {
+                          setLandDocs(prev => ({ ...prev, [land._id]: { score, docs } }));
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
 

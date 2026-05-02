@@ -193,3 +193,51 @@ exports.deleteLand = async (req, res) => {
     res.status(500).json({ error: 'Failed to delete listing.' });
   }
 };
+// POST /api/lands/:id/documents — seller uploads a document
+exports.uploadDocument = async (req, res) => {
+  try {
+    const land = await Land.findById(req.params.id);
+    if (!land) return res.status(404).json({ error: 'Land not found.' });
+    if (land.seller.toString() !== req.user._id.toString())
+      return res.status(403).json({ error: 'Not authorized.' });
+    if (!req.file)
+      return res.status(400).json({ error: 'Please upload a file.' });
+
+    const { docType } = req.body;
+    if (!docType)
+      return res.status(400).json({ error: 'Document type is required.' });
+
+    land.documents.push({
+      type:     docType,
+      filename: req.file.originalname,
+      path:     `/uploads/documents/${req.file.filename}`
+    });
+
+    land.calculateTrustScore();
+    await land.save();
+
+    res.json({ success: true, trustScore: land.trustScore, documents: land.documents });
+  } catch (error) {
+    console.error('Upload document error:', error);
+    res.status(500).json({ error: 'Failed to upload document.' });
+  }
+};
+
+// PUT /api/lands/:id/documents/:docId/verify — admin verifies a document
+exports.verifyDocument = async (req, res) => {
+  try {
+    const land = await Land.findById(req.params.id);
+    if (!land) return res.status(404).json({ error: 'Land not found.' });
+
+    const doc = land.documents.id(req.params.docId);
+    if (!doc) return res.status(404).json({ error: 'Document not found.' });
+
+    doc.verified = true;
+    land.calculateTrustScore();
+    await land.save();
+
+    res.json({ success: true, trustScore: land.trustScore, document: doc });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to verify document.' });
+  }
+};

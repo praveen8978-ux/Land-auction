@@ -379,6 +379,38 @@ export default function AdminPage() {
                           Payment UTR: {land.listingFeeUTR}
                         </p>
                       )}
+                      {/* Documents */}
+                      {(land as any).documents?.length > 0 && (
+                        <div className="mt-2">
+                          <p className="text-xs text-gray-500 mb-1">
+                            Trust score: <span className="font-semibold text-blue-600">{(land as any).trustScore}/100</span>
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {(land as any).documents.map((doc: any) => (
+                              <div key={doc._id} className="flex items-center gap-1">
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                  doc.verified ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                }`}>
+                                  {doc.type.replace(/_/g, ' ')} {doc.verified ? '✓' : '○'}
+                                </span>
+                                {!doc.verified && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        await api.put(`/api/lands/${land._id}/documents/${doc._id}/verify`);
+                                        fetchLands(tab === 'pending' ? 'pending' : undefined);
+                                      } catch {}
+                                    }}
+                                    className="text-xs text-blue-600 hover:underline"
+                                  >
+                                    Verify
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {land.status === 'pending' && (

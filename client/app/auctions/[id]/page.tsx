@@ -9,6 +9,7 @@ import api from '@/lib/api';
 import Navbar from '@/components/Navbar';
 import { useAuctionVoice } from '@/lib/useAuctionVoice';
 import ConsortiumPanel from '@/components/ConsortiumPanel';
+import TrustScore from '@/components/TrustScore';
 
 interface Bid {
   _id:      string;
@@ -25,9 +26,9 @@ interface Auction {
   endTime:       string;
   status:        string;
   totalBids:     number;
-  hasReserve?:   boolean;   // ← add
-  reserveMet?:   boolean;   // ← add
-  reservePrice?: number;    // ← admin only
+  hasReserve?:   boolean;
+  reserveMet?:   boolean;
+  reservePrice?: number;
   winner?:       { name: string; _id: string };
   winningAmount?: number;
   land: {
@@ -45,6 +46,8 @@ interface Auction {
     surveyNumber?: string;
     photos:        string[];
     seller:        { name: string; email: string };
+    trustScore:    number;
+    documents:     { type: string; verified: boolean }[];
   };
 }
 
@@ -78,7 +81,6 @@ export default function AuctionDetailPage() {
     return () => { voice.stop(); };
   }, [id]);
 
-  // Keep auctionRef in sync for use inside socket callback
   useEffect(() => {
     auctionRef.current = auction;
   }, [auction]);
@@ -120,7 +122,6 @@ export default function AuctionDetailPage() {
 
       voice.announceNewBid(data.amount, data.bidder, data.totalBids);
 
-      // Announce reserve met
       if (data.reserveJustMet) {
         setReserveJustMet(true);
         setTimeout(() => setReserveJustMet(false), 8000);
@@ -131,7 +132,6 @@ export default function AuctionDetailPage() {
     return () => { socket.disconnect(); };
   }, [auction?._id]);
 
-  // Countdown timer with voice warnings
   useEffect(() => {
     if (!auction) return;
 
@@ -151,7 +151,6 @@ export default function AuctionDetailPage() {
       if (h > 0) setTimeLeft(`${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`);
       else       setTimeLeft(`${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`);
 
-      // Trigger voice warnings at 5 min and 1 min
       if (totalMinutes !== minutesLeftRef.current) {
         minutesLeftRef.current = totalMinutes;
         voice.announceWarning(totalMinutes);
@@ -169,7 +168,6 @@ export default function AuctionDetailPage() {
       setAuction(res.data.auction);
       setBids(res.data.bids);
 
-      // Announce auction is live when page loads
       if (res.data.auction.status === 'live') {
         setTimeout(() => {
           voice.announceAuctionStart(res.data.auction.land.title);
@@ -245,7 +243,6 @@ export default function AuctionDetailPage() {
                     No photo
                   </div>
                 )}
-                {/* Live badge */}
                 {isLive && (
                   <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-green-600 text-white text-xs font-semibold px-3 py-1.5 rounded-full">
                     <span className="w-2 h-2 bg-white rounded-full animate-pulse"/>
@@ -300,6 +297,12 @@ export default function AuctionDetailPage() {
                   </span>
                 ))}
               </div>
+
+              {/* Trust score */}
+              <TrustScore
+                score={auction.land.trustScore || 0}
+                documents={auction.land.documents || []}
+              />
 
               {user?.role === 'admin' && auction.reservePrice && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4">
