@@ -50,7 +50,7 @@ export default function AdminPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  const [tab,             setTab]             = useState<'pending' | 'all' | 'users'>('pending');
+  const [tab,             setTab]             = useState<'pending' | 'all' | 'users' | 'payments'>('pending');
   const [lands,           setLands]           = useState<Land[]>([]);
   const [stats,           setStats]           = useState<Stats | null>(null);
   const [fetching,        setFetching]        = useState(true);
@@ -58,6 +58,7 @@ export default function AdminPage() {
   const [rejectReason,    setRejectReason]    = useState('');
   const [actionLoading,   setActionLoading]   = useState<string | null>(null);
   const [users,           setUsers]           = useState<any[]>([]);
+  const [payments,        setPayments]        = useState<any[]>([]);
   const [showAuctionForm, setShowAuctionForm] = useState(false);
   const [approvedLands,   setApprovedLands]   = useState<ApprovedLandForAuction[]>([]);
   const [auctionForm,     setAuctionForm]     = useState({ landId: '', startTime: '', endTime: '', reservePrice: '' });
@@ -104,6 +105,19 @@ export default function AdminPage() {
     }
   };
 
+  const fetchPayments = async () => {
+    setFetching(true);
+    try {
+      const res = await api.get('/api/auctions?status=ended');
+      const ended = res.data.auctions.filter((a: any) =>
+        a.paymentStatus === 'paid' || a.paymentStatus === 'confirmed'
+      );
+      setPayments(ended);
+    } catch {} finally {
+      setFetching(false);
+    }
+  };
+
   const fetchApprovedLands = async () => {
     try {
       const res = await api.get('/api/admin/lands?status=approved');
@@ -111,9 +125,10 @@ export default function AdminPage() {
     } catch {}
   };
 
-  const handleTab = (t: 'pending' | 'all' | 'users') => {
+  const handleTab = (t: 'pending' | 'all' | 'users' | 'payments') => {
     setTab(t);
-    if (t === 'users') fetchUsers();
+    if (t === 'users')    fetchUsers();
+    else if (t === 'payments') fetchPayments();
     else fetchLands(t === 'pending' ? 'pending' : undefined);
   };
 
@@ -152,6 +167,17 @@ export default function AdminPage() {
       setUsers(prev => prev.map(u => u._id === userId ? { ...u, role } : u));
     } catch (err: any) {
       alert(err.response?.data?.error || 'Failed to change role.');
+    }
+  };
+
+  const confirmPayment = async (auctionId: string) => {
+    try {
+      await api.post(`/api/payments/confirm/${auctionId}`);
+      fetchPayments();
+      fetchStats();
+      alert('Ownership confirmed and transfer email sent to winner!');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'Failed to confirm.');
     }
   };
 
@@ -219,7 +245,7 @@ export default function AdminPage() {
 
         {/* Tabs + Create auction button */}
         <div className="flex items-center gap-2 mb-6">
-          {(['pending', 'all', 'users'] as const).map(t => (
+          {(['pending', 'all', 'users', 'payments'] as const).map(t => (
             <button
               key={t}
               onClick={() => handleTab(t)}
@@ -229,7 +255,7 @@ export default function AdminPage() {
                   : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >
-              {t === 'pending' ? 'Pending listings' : t === 'all' ? 'All listings' : 'Users'}
+              {t === 'pending' ? 'Pending listings' : t === 'all' ? 'All listings' : t === 'users' ? 'Users' : 'Payments'}
             </button>
           ))}
 
@@ -331,7 +357,7 @@ export default function AdminPage() {
         )}
 
         {/* Lands tab */}
-        {tab !== 'users' && (
+        {(tab === 'pending' || tab === 'all') && (
           fetching ? (
             <div className="text-center py-20 text-gray-400">Loading...</div>
           ) : lands.length === 0 ? (
@@ -504,6 +530,64 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )
+        )}
+
+        {/* Payments tab */}
+        {tab === 'payments' && (
+          fetching ? (
+            <div className="text-center py-20 text-gray-400">Loading...</div>
+          ) : payments.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
+              <p className="text-gray-400">No payments to review.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {payments.map((auction: any) => (
+                <div key={auction._id} className="bg-white rounded-2xl border border-gray-100 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-gray-900">{auction.land?.title}</h3>
+                      <p className="text-sm text-gray-500 mt-1">
+                        Winner: <span className="font-medium">{auction.winner?.name}</span>
+                      </p>
+                      <p className="text-blue-600 font-bold text-lg mt-1">
+                        ₹{auction.currentPrice?.toLocaleString('en-IN')}
+                      </p>
+                      {auction.paymentId && (
+                        <p className="text-xs text-green-600 mt-1 font-mono">
+                          Razorpay ID: {auction.paymentId}
+                        </p>
+                      )}
+                      {auction.paymentDate && (
+                        <p className="text-xs text-gray-400 mt-1">
+                          Paid on: {new Date(auction.paymentDate).toLocaleString('en-IN')}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex flex-col gap-2 flex-shrink-0">
+                      <span className={`text-xs font-semibold px-3 py-1 rounded-full text-center ${
+                        auction.paymentStatus === 'confirmed'
+                          ? 'bg-green-100 text-green-700'
+                          : 'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {auction.paymentStatus === 'confirmed' ? 'Ownership transferred' : 'Payment received'}
+                      </span>
+
+                      {auction.paymentStatus === 'paid' && (
+                        <button
+                          onClick={() => confirmPayment(auction._id)}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
+                        >
+                          Confirm ownership
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )
         )}

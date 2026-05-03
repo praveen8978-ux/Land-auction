@@ -19,17 +19,19 @@ interface Bid {
 }
 
 interface Auction {
-  _id:           string;
-  currentPrice:  number;
-  startingPrice: number;
-  startTime:     string;
-  endTime:       string;
-  status:        string;
-  totalBids:     number;
-  hasReserve?:   boolean;
-  reserveMet?:   boolean;
-  reservePrice?: number;
-  winner?:       { name: string; _id: string };
+  _id:            string;
+  currentPrice:   number;
+  startingPrice:  number;
+  startTime:      string;
+  endTime:        string;
+  status:         string;
+  totalBids:      number;
+  hasReserve?:    boolean;
+  reserveMet?:    boolean;
+  reservePrice?:  number;
+  paymentStatus?: string;
+  paymentId?:     string;
+  winner?:        { name: string; _id: string };
   winningAmount?: number;
   land: {
     title:         string;
@@ -45,9 +47,9 @@ interface Auction {
     electricity:   boolean;
     surveyNumber?: string;
     photos:        string[];
-    seller:        { name: string; email: string };
     trustScore:    number;
     documents:     { type: string; verified: boolean }[];
+    seller:        { name: string; email: string };
   };
 }
 
@@ -73,8 +75,15 @@ export default function AuctionDetailPage() {
   const socketRef      = useRef<Socket | null>(null);
   const minutesLeftRef = useRef<number>(999);
   const auctionRef     = useRef<Auction | null>(null);
+  // Always-current ref so socket/timer callbacks never read a stale closure
+  const voiceEnabledRef = useRef(voiceEnabled);
 
   const voice = useAuctionVoice({ enabled: voiceEnabled, rate: 0.88 });
+
+  // Keep the ref in sync whenever state changes
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled]);
 
   useEffect(() => {
     fetchAuction();
@@ -120,12 +129,17 @@ export default function AuctionDetailPage() {
       setNewBidFlash(true);
       setTimeout(() => setNewBidFlash(false), 1000);
 
-      voice.announceNewBid(data.amount, data.bidder, data.totalBids);
+      // Use ref — not state — so this always reflects the current mute status
+      if (voiceEnabledRef.current) {
+        voice.announceNewBid(data.amount, data.bidder, data.totalBids);
+      }
 
       if (data.reserveJustMet) {
         setReserveJustMet(true);
         setTimeout(() => setReserveJustMet(false), 8000);
-        voice.announce('Reserve price has been met! This auction will now complete.');
+        if (voiceEnabledRef.current) {
+          voice.announce('Reserve price has been met! This auction will now complete.');
+        }
       }
     });
 
@@ -139,7 +153,7 @@ export default function AuctionDetailPage() {
       const diff = new Date(auction.endTime).getTime() - Date.now();
       if (diff <= 0) {
         setTimeLeft('Auction ended');
-        voice.announceWarning(0);
+        if (voiceEnabledRef.current) voice.announceWarning(0);
         return;
       }
 
@@ -153,7 +167,8 @@ export default function AuctionDetailPage() {
 
       if (totalMinutes !== minutesLeftRef.current) {
         minutesLeftRef.current = totalMinutes;
-        voice.announceWarning(totalMinutes);
+        // Use ref — not state — so the interval always reflects the current mute status
+        if (voiceEnabledRef.current) voice.announceWarning(totalMinutes);
       }
     };
 
@@ -170,7 +185,9 @@ export default function AuctionDetailPage() {
 
       if (res.data.auction.status === 'live') {
         setTimeout(() => {
-          voice.announceAuctionStart(res.data.auction.land.title);
+          if (voiceEnabledRef.current) {
+            voice.announceAuctionStart(res.data.auction.land.title);
+          }
         }, 1000);
       }
     } catch {
@@ -333,8 +350,10 @@ export default function AuctionDetailPage() {
                 <p className="text-xs text-gray-400">Auctioneer voice</p>
                 <button
                   onClick={() => {
-                    setVoiceEnabled(v => !v);
-                    if (voiceEnabled) voice.stop();
+                    const next = !voiceEnabled;
+                    setVoiceEnabled(next);
+                    voiceEnabledRef.current = next; // update ref immediately, don't wait for re-render
+                    if (!next) voice.stop();
                   }}
                   className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                     voiceEnabled
@@ -402,6 +421,17 @@ export default function AuctionDetailPage() {
                 <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 text-center">
                   <p className="text-xs text-yellow-700 font-semibold">Winner</p>
                   <p className="text-sm font-bold text-yellow-800">{auction.winner.name}</p>
+                  {user && auction.winner._id === user.id && auction.paymentStatus !== 'confirmed' && (
+                    <Link
+                      href={`/auctions/${auction._id}/payment`}
+                      className="mt-2 inline-block bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-semibold hover:bg-blue-700"
+                    >
+                      {auction.paymentStatus === 'paid' ? 'Payment received ✓' : 'Pay now →'}
+                    </Link>
+                  )}
+                  {user && auction.winner._id === user.id && auction.paymentStatus === 'confirmed' && (
+                    <p className="text-xs text-green-700 mt-2 font-semibold">Ownership transferred ✓</p>
+                  )}
                 </div>
               )}
 

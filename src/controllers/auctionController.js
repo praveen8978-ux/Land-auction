@@ -2,13 +2,19 @@ const Auction = require('../models/Auction');
 const Bid     = require('../models/Bid');
 const Land    = require('../models/Land');
 
-// GET /api/auctions — all live and upcoming auctions
+
+// GET /api/auctions — list auctions with optional filters
 exports.getAuctions = async (req, res) => {
   try {
     const { status, landType, state } = req.query;
     const filter = {};
-    if (status)   filter.status = status;
-    else          filter.status = { $in: ['live', 'upcoming'] };
+
+    if (status) {
+      filter.status = status;
+    } else {
+      // Default — show live and upcoming
+      filter.status = { $in: ['live', 'upcoming'] };
+    }
 
     const auctions = await Auction.find(filter)
       .populate({
@@ -18,9 +24,9 @@ exports.getAuctions = async (req, res) => {
           : {},
         populate: { path: 'seller', select: 'name' }
       })
-      .sort({ status: -1, startTime: 1 });
+      .populate('winner', 'name _id')
+      .sort({ status: -1, startTime: -1 });
 
-    // Filter out nulls (land didn't match the filter)
     const filtered = auctions.filter(a => a.land !== null);
     res.json({ success: true, auctions: filtered });
   } catch (error) {
@@ -33,29 +39,22 @@ exports.getAuctions = async (req, res) => {
 exports.getAuction = async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.id)
-      .populate({ path: 'land', populate: { path: 'seller', select: 'name email' } })
-      .populate('winner', 'name');
+      .populate({
+        path: 'land',
+        populate: { path: 'seller', select: 'name email phone' }
+      })
+      .populate('winner', 'name _id');
 
     if (!auction) return res.status(404).json({ error: 'Auction not found.' });
 
     const bids = await Bid.find({ auction: auction._id })
       .populate('bidder', 'name')
-      .sort('-placedAt')
-      .limit(20);
+      .sort({ createdAt: -1 })
+      .limit(50);
 
-    // Hide actual reserve price from buyers — only show if met or user is admin
-    const auctionData = auction.toObject();
-    const isAdmin = req.user?.role === 'admin';
-
-    if (!isAdmin) {
-      // Buyers only see whether reserve is set and whether it has been met
-      auctionData.hasReserve  = !!auction.reservePrice;
-      auctionData.reserveMet  = auction.reserveMet;
-      delete auctionData.reservePrice; // never expose the actual amount
-    }
-
-    res.json({ success: true, auction: auctionData, bids });
+    res.json({ success: true, auction, bids });
   } catch (error) {
+    console.error('Get auction error:', error);
     res.status(500).json({ error: 'Failed to fetch auction.' });
   }
 };

@@ -13,6 +13,11 @@ interface Auction {
   endTime:       string;
   status:        'upcoming' | 'live' | 'ended';
   totalBids:     number;
+  paymentStatus?: string;
+  winner?: {
+    _id:  string;
+    name: string;
+  };
   land: {
     _id:      string;
     title:    string;
@@ -35,24 +40,36 @@ const statusStyle: Record<string, string> = {
 export default function AuctionsPage() {
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState<'all' | 'live' | 'upcoming'>('all');
+  const [filter,   setFilter]   = useState<'all' | 'live' | 'upcoming' | 'ended'>('all');
+  const [user,     setUser]     = useState<{ id: string } | null>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('user');
+      if (stored) setUser(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
 
   useEffect(() => {
     fetchAuctions();
   }, [filter]);
 
   const fetchAuctions = async () => {
-    setLoading(true);
-    try {
-      const params = filter !== 'all' ? `?status=${filter}` : '';
-      const res = await api.get(`/api/auctions${params}`);
-      setAuctions(res.data.auctions);
-    } catch {
-      console.error('Failed to fetch auctions');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    let params = '';
+    if (filter === 'live')     params = '?status=live';
+    else if (filter === 'upcoming') params = '?status=upcoming';
+    else if (filter === 'ended')    params = '?status=ended';
+    // 'all' fetches live + upcoming (default)
+    const res = await api.get(`/api/auctions${params}`);
+    setAuctions(res.data.auctions);
+  } catch (err: any) {
+    console.error('Failed to fetch auctions:', err?.response?.status, err?.response?.data || err?.message || err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const timeLeft = (endTime: string) => {
     const diff = new Date(endTime).getTime() - Date.now();
@@ -76,7 +93,7 @@ export default function AuctionsPage() {
 
           {/* Filter tabs */}
           <div className="flex gap-2">
-            {(['all', 'live', 'upcoming'] as const).map(f => (
+            {(['all', 'live', 'upcoming', 'ended'] as const).map(f => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -86,7 +103,7 @@ export default function AuctionsPage() {
                     : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                 }`}
               >
-                {f === 'all' ? 'All' : f === 'live' ? 'Live now' : 'Upcoming'}
+                {f === 'all' ? 'All' : f === 'live' ? 'Live now' : f === 'upcoming' ? 'Upcoming' : 'Ended'}
               </button>
             ))}
           </div>
@@ -102,8 +119,10 @@ export default function AuctionsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {auctions.map(auction => (
-              <Link key={auction._id} href={`/auctions/${auction._id}`}>
-                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+              <div key={auction._id} className="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+
+                {/* Clickable card body */}
+                <Link href={`/auctions/${auction._id}`} className="block">
 
                   {/* Photo */}
                   <div className="h-48 bg-gray-100 relative">
@@ -152,8 +171,24 @@ export default function AuctionsPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </Link>
+
+                </Link>
+
+                {/* Pay now button for winner — outside the card Link to avoid nested <a> */}
+                {auction.status === 'ended' && auction.winner?._id === user?.id && (
+                  <div className="px-4 pb-4">
+                    <Link
+                      href={`/auctions/${auction._id}/payment`}
+                      className="block w-full text-center bg-green-600 text-white py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
+                    >
+                      {auction.paymentStatus === 'paid'      ? '✓ Payment received'     :
+                       auction.paymentStatus === 'confirmed' ? '✓ Ownership transferred' :
+                       'Pay now →'}
+                    </Link>
+                  </div>
+                )}
+
+              </div>
             ))}
           </div>
         )}
