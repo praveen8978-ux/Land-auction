@@ -373,7 +373,7 @@ export default function AdminPage() {
                     <div className="w-32 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                       {land.photos[0] ? (
                         <img
-                          src={`http://localhost:3000${land.photos[0]}`}
+                          src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${land.photos[0]}`}
                           alt={land.title}
                           className="w-full h-full object-cover"
                         />
@@ -555,9 +555,9 @@ export default function AdminPage() {
                       <p className="text-blue-600 font-bold text-lg mt-1">
                         ₹{auction.currentPrice?.toLocaleString('en-IN')}
                       </p>
-                      {auction.paymentId && (
+                      {auction.paymentUTR && (
                         <p className="text-xs text-green-600 mt-1 font-mono">
-                          Razorpay ID: {auction.paymentId}
+                          Payment UTR: {auction.paymentUTR}
                         </p>
                       )}
                       {auction.paymentDate && (

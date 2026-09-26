@@ -128,7 +128,7 @@ export default function AuctionsPage() {
                   <div className="h-48 bg-gray-100 relative">
                     {auction.land?.photos?.[0] ? (
                       <img
-                        src={`http://localhost:3000${auction.land.photos[0]}`}
+                        src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${auction.land.photos[0]}`}
                         alt={auction.land.title}
                         className="w-full h-full object-cover"
                       />

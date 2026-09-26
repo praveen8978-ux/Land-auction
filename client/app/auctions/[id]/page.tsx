@@ -251,7 +251,7 @@ export default function AuctionDetailPage() {
               <div className="h-72 bg-gray-100 relative">
                 {auction.land.photos[activePhoto] ? (
                   <img
-                    src={`http://localhost:3000${auction.land.photos[activePhoto]}`}
+                    src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${auction.land.photos[activePhoto]}`}
                     alt={auction.land.title}
                     className="w-full h-full object-cover"
                   />
@@ -275,7 +275,7 @@ export default function AuctionDetailPage() {
                       onClick={() => setActivePhoto(i)}
                       className={`w-14 h-10 rounded-lg overflow-hidden border-2 ${i === activePhoto ? 'border-blue-500' : 'border-transparent'}`}
                     >
-                      <img src={`http://localhost:3000${p}`} alt="" className="w-full h-full object-cover"/>
+                      <img src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${p}`} alt="" className="w-full h-full object-cover"/>
                     </button>
                   ))}
                 </div>

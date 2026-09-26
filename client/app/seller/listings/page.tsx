@@ -127,7 +127,7 @@ export default function MyListingsPage() {
                 <div className="w-28 h-24 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
                   {land.photos[0] ? (
                     <img
-                      src={`http://localhost:3000${land.photos[0]}`}
+                      src={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'}${land.photos[0]}`}
                       alt={land.title}
                       className="w-full h-full object-cover"
                     />

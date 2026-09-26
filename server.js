@@ -43,9 +43,8 @@ const updateAuctionStatuses = async () => {
 updateAuctionStatuses();
 setInterval(updateAuctionStatuses, 60 * 1000);
 
-// Frontend (Next.js) runs on 3000 — this backend must run on a different port.
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: process.env.CLIENT_URL || 'http://localhost:3000',
   credentials: true
 }));
 
