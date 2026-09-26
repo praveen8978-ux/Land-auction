@@ -16,6 +16,7 @@ const auctionRoutes = require('./src/routes/auctionRoutes');
 const consortiumRoutes = require('./src/routes/consortiumRoutes');
 
 const app    = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 const io     = initSocket(server);
 app.set('io', io);
@@ -59,7 +60,8 @@ app.use(session({
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7,
     httpOnly: true,
-    sameSite: 'lax'
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    secure:   process.env.NODE_ENV === 'production'
   }
 }));
 
