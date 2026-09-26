@@ -1,16 +1,11 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
+const FROM = process.env.EMAIL_FROM || 'Land Auction <onboarding@resend.dev>';
 
 const sendOTPEmail = async (email, otp, name) => {
-  const mailOptions = {
-    from:    `"Land Auction" <${process.env.EMAIL_USER}>`,
+  await resend.emails.send({
+    from:    FROM,
     to:      email,
     subject: 'Your login OTP — Land Auction',
     html: `
@@ -32,14 +27,12 @@ const sendOTPEmail = async (email, otp, name) => {
         </p>
       </div>
     `
-  };
-
-  await transporter.sendMail(mailOptions);
+  });
 };
 
 const sendLocationAlertEmail = async (email, name, land, distanceKm) => {
-  const mailOptions = {
-    from:    `"Land Auction" <${process.env.EMAIL_USER}>`,
+  await resend.emails.send({
+    from:    FROM,
     to:      email,
     subject: `New land listed ${Math.round(distanceKm)}km from you — Land Auction`,
     html: `
@@ -70,9 +63,61 @@ const sendLocationAlertEmail = async (email, name, land, distanceKm) => {
         </p>
       </div>
     `
-  };
-
-  await transporter.sendMail(mailOptions);
+  });
 };
 
-module.exports = { sendOTPEmail, sendLocationAlertEmail };
+const sendPaymentSubmittedEmails = async ({ winnerEmail, winnerName, sellerEmail, sellerName, landTitle, amount, utr }) => {
+  await Promise.all([
+    resend.emails.send({
+      from:    FROM,
+      to:      winnerEmail,
+      subject: 'Payment submitted — Land Auction',
+      html: `
+        <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+          <h2 style="color: #2563eb;">Payment submitted!</h2>
+          <p>Hi ${winnerName}, we've received your payment details of <strong>₹${amount.toLocaleString('en-IN')}</strong> for <strong>${landTitle}</strong>.</p>
+          <p>Transaction ID: <code>${utr}</code></p>
+          <p>Our team will verify the payment and process the land ownership transfer within 24-48 hours.</p>
+        </div>
+      `
+    }),
+    resend.emails.send({
+      from:    FROM,
+      to:      sellerEmail,
+      subject: 'Payment submitted for your land — Land Auction',
+      html: `
+        <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+          <h2 style="color: #16a34a;">Payment submitted!</h2>
+          <p>Hi ${sellerName}, the buyer has submitted payment of <strong>₹${amount.toLocaleString('en-IN')}</strong> for your land <strong>${landTitle}</strong>.</p>
+          <p>Transaction ID: <code>${utr}</code></p>
+          <p>Buyer: ${winnerName} (${winnerEmail})</p>
+          <p>The funds will be transferred to you after our team verifies the transaction and confirms ownership.</p>
+        </div>
+      `
+    })
+  ]);
+};
+
+const sendOwnershipTransferEmail = async ({ winnerEmail, winnerName, landTitle, sellerName, sellerEmail, amount }) => {
+  await resend.emails.send({
+    from:    FROM,
+    to:      winnerEmail,
+    subject: 'Land ownership transferred — Land Auction',
+    html: `
+      <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
+        <h2 style="color: #16a34a;">Congratulations! 🎉</h2>
+        <p>Hi ${winnerName}, ownership of <strong>${landTitle}</strong> has been officially transferred to you.</p>
+        <p>Please contact the seller to complete the registration process:</p>
+        <p><strong>${sellerName}</strong> — ${sellerEmail}</p>
+        <p>Amount paid: ₹${amount.toLocaleString('en-IN')}</p>
+      </div>
+    `
+  });
+};
+
+module.exports = {
+  sendOTPEmail,
+  sendLocationAlertEmail,
+  sendPaymentSubmittedEmails,
+  sendOwnershipTransferEmail
+};

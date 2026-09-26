@@ -1,7 +1,7 @@
 const Auction = require('../models/Auction');
 const Land    = require('../models/Land');
 const User    = require('../models/User');
-const { sendOTPEmail } = require('../services/emailService');
+const { sendPaymentSubmittedEmails, sendOwnershipTransferEmail } = require('../services/emailService');
 
 // POST /api/payments/submit
 // Winner submits their UPI UTR / transaction ID after paying manually
@@ -33,45 +33,16 @@ exports.submitPayment = async (req, res) => {
     auction.paymentDate   = new Date();
     await auction.save();
 
-    // Send confirmation emails
-    const winnerEmail = {
-      to:      auction.winner.email,
-      subject: 'Payment submitted — Land Auction',
-      html: `
-        <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #2563eb;">Payment submitted!</h2>
-          <p>Hi ${auction.winner.name}, we've received your payment details of <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for <strong>${auction.land.title}</strong>.</p>
-          <p>Transaction ID: <code>${utr.trim()}</code></p>
-          <p>Our team will verify the payment and process the land ownership transfer within 24-48 hours.</p>
-        </div>
-      `
-    };
-
-    const sellerEmail = {
-      to:      auction.land.seller.email,
-      subject: 'Payment submitted for your land — Land Auction',
-      html: `
-        <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #16a34a;">Payment submitted!</h2>
-          <p>Hi ${auction.land.seller.name}, the buyer has submitted payment of <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for your land <strong>${auction.land.title}</strong>.</p>
-          <p>Transaction ID: <code>${utr.trim()}</code></p>
-          <p>Buyer: ${auction.winner.name} (${auction.winner.email})</p>
-          <p>The funds will be transferred to you after our team verifies the transaction and confirms ownership.</p>
-        </div>
-      `
-    };
-
-    // Send emails asynchronously
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    });
-
-    Promise.all([
-      transporter.sendMail({ from: `"Land Auction" <${process.env.EMAIL_USER}>`, ...winnerEmail }),
-      transporter.sendMail({ from: `"Land Auction" <${process.env.EMAIL_USER}>`, ...sellerEmail })
-    ]).catch(err => console.error('Email send error:', err));
+    // Send confirmation emails asynchronously — never block or fail the response on email issues
+    sendPaymentSubmittedEmails({
+      winnerEmail: auction.winner.email,
+      winnerName:  auction.winner.name,
+      sellerEmail: auction.land.seller.email,
+      sellerName:  auction.land.seller.name,
+      landTitle:   auction.land.title,
+      amount:      auction.currentPrice,
+      utr:         utr.trim()
+    }).catch(err => console.error('Payment email send error:', err));
 
     // Emit real time notification
     req.app.get('io').emit('paymentReceived', {
@@ -110,27 +81,15 @@ exports.confirmOwnership = async (req, res) => {
     // Mark land as sold
     await Land.findByIdAndUpdate(auction.land._id, { status: 'sold' });
 
-    // Send ownership transfer email to winner
-    const nodemailer = require('nodemailer');
-    const transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
-    });
-
-    await transporter.sendMail({
-      from:    `"Land Auction" <${process.env.EMAIL_USER}>`,
-      to:      auction.winner.email,
-      subject: 'Land ownership transferred — Land Auction',
-      html: `
-        <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #16a34a;">Congratulations! 🎉</h2>
-          <p>Hi ${auction.winner.name}, ownership of <strong>${auction.land.title}</strong> has been officially transferred to you.</p>
-          <p>Please contact the seller to complete the registration process:</p>
-          <p><strong>${auction.land.seller.name}</strong> — ${auction.land.seller.email}</p>
-          <p>Amount paid: ₹${auction.currentPrice.toLocaleString('en-IN')}</p>
-        </div>
-      `
-    });
+    // Send ownership transfer email asynchronously — don't let an email hiccup block this response
+    sendOwnershipTransferEmail({
+      winnerEmail: auction.winner.email,
+      winnerName:  auction.winner.name,
+      landTitle:   auction.land.title,
+      sellerName:  auction.land.seller.name,
+      sellerEmail: auction.land.seller.email,
+      amount:      auction.currentPrice
+    }).catch(err => console.error('Ownership transfer email send error:', err));
 
     res.json({ success: true, message: 'Ownership transferred successfully.' });
   } catch (error) {
