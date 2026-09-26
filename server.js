@@ -43,8 +43,9 @@ const updateAuctionStatuses = async () => {
 updateAuctionStatuses();
 setInterval(updateAuctionStatuses, 60 * 1000);
 
+// Frontend (Next.js) runs on 3000 — this backend must run on a different port.
 app.use(cors({
-  origin: 'http://localhost:3001',
+  origin: 'http://localhost:3000',
   credentials: true
 }));
 
@@ -88,7 +89,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Something went wrong on our end' });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`API server running at http://localhost:${PORT}`);
 });

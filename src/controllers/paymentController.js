@@ -1,18 +1,19 @@
-const { createOrder, verifyPayment } = require('../services/paymentService');
 const Auction = require('../models/Auction');
 const Land    = require('../models/Land');
 const User    = require('../models/User');
 const { sendOTPEmail } = require('../services/emailService');
 
-// POST /api/payments/create-order
-// Winner calls this to create a Razorpay order
-exports.createPaymentOrder = async (req, res) => {
+// POST /api/payments/submit
+// Winner submits their UPI UTR / transaction ID after paying manually
+exports.submitPayment = async (req, res) => {
   try {
-    const { auctionId } = req.body;
+    const { auctionId, utr } = req.body;
+
+    if (!utr || !utr.trim())
+      return res.status(400).json({ error: 'UTR / transaction ID is required.' });
 
     const auction = await Auction.findById(auctionId)
-      .populate('winner',  'name email')
-      .populate('land',    'title seller startingPrice')
+      .populate('winner', 'name email')
       .populate({ path: 'land', populate: { path: 'seller', select: 'name email' } });
 
     if (!auction)
@@ -26,102 +27,36 @@ exports.createPaymentOrder = async (req, res) => {
     if (auction.paymentStatus === 'confirmed')
       return res.status(400).json({ error: 'Payment already confirmed.' });
 
-    // Create Razorpay order
-    const order = await createOrder(
-      auction.currentPrice,
-      `auction_${auctionId}`,
-      {
-        auctionId: auctionId,
-        landTitle: auction.land.title,
-        winnerId:  req.user._id.toString(),
-        winnerName: req.user.name
-      }
-    );
-
-    // Save order ID to auction
-    auction.razorpayOrderId = order.id;
-    await auction.save();
-
-    res.json({
-      success:  true,
-      orderId:  order.id,
-      amount:   order.amount,
-      currency: order.currency,
-      keyId:    process.env.RAZORPAY_KEY_ID,
-      prefill: {
-        name:  req.user.name,
-        email: req.user.email
-      },
-      land: {
-        title:  auction.land.title,
-        seller: auction.land.seller.name
-      }
-    });
-  } catch (error) {
-    console.error('Create order error:', error);
-    res.status(500).json({ error: 'Failed to create payment order.' });
-  }
-};
-
-// POST /api/payments/verify
-// Called after Razorpay payment is completed
-exports.verifyPayment = async (req, res) => {
-  try {
-    const {
-      auctionId,
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature
-    } = req.body;
-
-    // Verify payment signature
-    const isValid = verifyPayment(
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature
-    );
-
-    if (!isValid)
-      return res.status(400).json({ error: 'Payment verification failed. Invalid signature.' });
-
-    const auction = await Auction.findById(auctionId)
-      .populate('winner', 'name email')
-      .populate({ path: 'land', populate: { path: 'seller', select: 'name email' } });
-
-    if (!auction)
-      return res.status(404).json({ error: 'Auction not found.' });
-
-    // Update auction payment status
-    auction.paymentStatus    = 'paid';
-    auction.paymentId        = razorpay_payment_id;
-    auction.razorpayOrderId  = razorpay_order_id;
-    auction.paymentDate      = new Date();
+    // Record the manual payment — admin will verify and confirm ownership
+    auction.paymentStatus = 'paid';
+    auction.paymentUTR    = utr.trim();
+    auction.paymentDate   = new Date();
     await auction.save();
 
     // Send confirmation emails
     const winnerEmail = {
       to:      auction.winner.email,
-      subject: 'Payment confirmed — Land Auction',
+      subject: 'Payment submitted — Land Auction',
       html: `
         <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #2563eb;">Payment Successful!</h2>
-          <p>Hi ${auction.winner.name}, your payment of <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for <strong>${auction.land.title}</strong> has been received.</p>
-          <p>Payment ID: <code>${razorpay_payment_id}</code></p>
-          <p>Our team will process the land ownership transfer within 24-48 hours.</p>
+          <h2 style="color: #2563eb;">Payment submitted!</h2>
+          <p>Hi ${auction.winner.name}, we've received your payment details of <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for <strong>${auction.land.title}</strong>.</p>
+          <p>Transaction ID: <code>${utr.trim()}</code></p>
+          <p>Our team will verify the payment and process the land ownership transfer within 24-48 hours.</p>
         </div>
       `
     };
 
     const sellerEmail = {
       to:      auction.land.seller.email,
-      subject: 'Payment received for your land — Land Auction',
+      subject: 'Payment submitted for your land — Land Auction',
       html: `
         <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
-          <h2 style="color: #16a34a;">Payment Received!</h2>
-          <p>Hi ${auction.land.seller.name}, the buyer has paid <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for your land <strong>${auction.land.title}</strong>.</p>
-          <p>Payment ID: <code>${razorpay_payment_id}</code></p>
+          <h2 style="color: #16a34a;">Payment submitted!</h2>
+          <p>Hi ${auction.land.seller.name}, the buyer has submitted payment of <strong>₹${auction.currentPrice.toLocaleString('en-IN')}</strong> for your land <strong>${auction.land.title}</strong>.</p>
+          <p>Transaction ID: <code>${utr.trim()}</code></p>
           <p>Buyer: ${auction.winner.name} (${auction.winner.email})</p>
-          <p>The funds will be transferred to you after ownership verification.</p>
+          <p>The funds will be transferred to you after our team verifies the transaction and confirms ownership.</p>
         </div>
       `
     };
@@ -146,17 +81,17 @@ exports.verifyPayment = async (req, res) => {
     });
 
     res.json({
-      success:   true,
-      message:   'Payment verified successfully.',
-      paymentId: razorpay_payment_id
+      success: true,
+      message: 'Payment details submitted. We will verify and confirm shortly.',
+      paymentUTR: auction.paymentUTR
     });
   } catch (error) {
-    console.error('Verify payment error:', error);
-    res.status(500).json({ error: 'Payment verification failed.' });
+    console.error('Submit payment error:', error);
+    res.status(500).json({ error: 'Failed to submit payment.' });
   }
 };
 
-// POST /api/payments/confirm/:auctionId — admin confirms and transfers ownership
+// POST /api/payments/confirm/:auctionId — admin verifies UTR and transfers ownership
 exports.confirmOwnership = async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.auctionId)
@@ -208,7 +143,7 @@ exports.confirmOwnership = async (req, res) => {
 exports.getPaymentStatus = async (req, res) => {
   try {
     const auction = await Auction.findById(req.params.auctionId)
-      .select('paymentStatus paymentId currentPrice winner status')
+      .select('paymentStatus paymentUTR currentPrice winner status')
       .populate('winner', 'name');
 
     if (!auction) return res.status(404).json({ error: 'Auction not found.' });

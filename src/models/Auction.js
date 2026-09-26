@@ -18,10 +18,6 @@ const auctionSchema = new mongoose.Schema({
   paymentUTR:     { type: String },
   paymentDate:    { type: Date },
   createdAt:      { type: Date, default: Date.now },
-  razorpayOrderId: { type: String },
-  paymentId:       { type: String },
-  paymentStatus:   { type: String, enum: ['pending', 'paid', 'confirmed'], default: 'pending' },
-  paymentDate:     { type: Date },
 });
 
 auctionSchema.pre('save', async function() {
